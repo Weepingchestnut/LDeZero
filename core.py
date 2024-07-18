@@ -5,6 +5,17 @@ class Variable:
     def __init__(self, data: np.ndarray) -> None:
         self.data = data
         self.grad = None
+        self.creator = None
+    
+    def set_creator(self, func):
+        self.creator = func
+    
+    def backward(self):
+        f = self.creator        # 1. get func
+        if f is not None:
+            x = f.input         # 2. get func's input
+            x.grad = f.backward(self.grad)      # call func's backward
+            x.backward()        # 调用自己前面那个变量的backward方法（递归）
 
 
 class Function:
@@ -13,7 +24,10 @@ class Function:
         y = self.forward(x)
 
         output = Variable(y)
+        output.set_creator(self)    # make output variable save creator information
+        
         self.input = input          # save the variable of input
+        self.output = output        # alse save output variable
 
         return output
     
@@ -61,10 +75,30 @@ if __name__ == '__main__':
     y = C(b)
     # print(f'{y=}')
 
+    assert y.creator == C
+
     y.grad = np.array(1.0)
-    b.grad = C.backward(y.grad)
-    a.grad = B.backward(b.grad)
-    x.grad = A.backward(a.grad)
+
+    y.backward()
+
+    # ----------------------------
+    # C = y.creator
+    # b = C.input
+    # b.grad = C.backward(y.grad)
+
+    # B = b.creator
+    # a = B.input
+    # a.grad = B.backward(b.grad)
+
+    # A = a.creator
+    # x = A.input
+    # x.grad = A.backward(a.grad)
+
+    # ---------------------------
+    # b.grad = C.backward(y.grad)
+    # a.grad = B.backward(b.grad)
+    # x.grad = A.backward(a.grad)
+
     print(f'{x.grad=}')
 
 
