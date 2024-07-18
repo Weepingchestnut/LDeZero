@@ -11,11 +11,23 @@ class Variable:
         self.creator = func
     
     def backward(self):
-        f = self.creator        # 1. get func
-        if f is not None:
-            x = f.input         # 2. get func's input
-            x.grad = f.backward(self.grad)      # call func's backward
-            x.backward()        # 调用自己前面那个变量的backward方法（递归）
+
+        # ------ recurrent implementation ------
+        # f = self.creator        # 1. get func
+        # if f is not None:
+        #     x = f.input         # 2. get func's input
+        #     x.grad = f.backward(self.grad)      # call func's backward
+        #     x.backward()        # 调用自己前面那个变量的backward方法（递归）
+        
+        # ------ for loop implementation -----
+        funcs = [self.creator]
+        while funcs:
+            f = funcs.pop()                 # 1. get func
+            x, y = f.input, f.output        # 2. get func's input
+            x.grad = f.backward(y.grad)     # 3. backward call backward
+
+            if x.creator is not None:
+                funcs.append(x.creator)     # 将前一个函数添加到list中
 
 
 class Function:
