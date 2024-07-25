@@ -1,3 +1,4 @@
+from typing import Tuple
 import numpy as np
 
 
@@ -43,18 +44,22 @@ def as_array(x):
 
 
 class Function:
-    def __call__(self, inputs):
+    def __call__(self, *inputs):
         xs = [x.data for x in inputs]
-        ys = self.forward(xs)
+
+        ys = self.forward(*xs)
+        if not isinstance(ys, Tuple):
+            ys = (ys,)
 
         outputs = [Variable(as_array(y)) for y in ys]
+
         for output in outputs:
             output.set_creator(self)    # make output variable save creator information
         
         self.inputs = inputs          # save the variable of input
         self.outputs = outputs        # alse save output variable
 
-        return outputs
+        return outputs if len(outputs) > 1 else outputs[0]
     
     def forward(self, xs):
         raise NotImplementedError()
@@ -98,56 +103,29 @@ def exp(x):
 
 
 class Add(Function):
-    def forward(self, xs):
-        x0, x1 = xs
+    def forward(self, x0, x1):
         y = x0 + x1
 
-        return (y,)
+        return y
+
+
+def add(x0, x1):
+    return Add()(x0, x1)
 
 
 if __name__ == '__main__':
-    # A = Square()
-    # B = Exp()
-    # C = Square()
+    # xs = [Variable(np.array(2)), Variable(np.array(3))]
+    x0 = Variable(np.array(2))
+    x1 = Variable(np.array(3))
 
-    x = Variable(np.array(0.5))
-    # x = Variable(None)
-
-    # x = Variable(1.0)           # TypeError
-    # --------------------------
-    # a = square(x)
-    # b = exp(a)
-    # y = square(b)
+    # f = Add()
+    # y = f(x0, x1)
     # -->
-    y = square(exp(square(x)))
-    # --------------------------
-    # print(f'{y=}')
+    y = add(x0, x1)
 
-    # assert y.creator == C
+    print(y.data)
 
-    # y.grad = np.array(1.0)
-
-    y.backward()
-
-    # ----------------------------
-    # C = y.creator
-    # b = C.input
-    # b.grad = C.backward(y.grad)
-
-    # B = b.creator
-    # a = B.input
-    # a.grad = B.backward(b.grad)
-
-    # A = a.creator
-    # x = A.input
-    # x.grad = A.backward(a.grad)
-
-    # ---------------------------
-    # b.grad = C.backward(y.grad)
-    # a.grad = B.backward(b.grad)
-    # x.grad = A.backward(a.grad)
-
-    print(f'{x.grad=}')
+    # print(f'{x.grad=}')
 
 
 
