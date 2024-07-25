@@ -2,7 +2,11 @@ import numpy as np
 
 
 class Variable:
-    def __init__(self, data: np.ndarray) -> None:
+    def __init__(self, data) -> None:
+        if data is not None:
+            if not isinstance(data, np.ndarray):
+                raise TypeError('{} is not supported'.format(type(data)))
+
         self.data = data
         self.grad = None
         self.creator = None
@@ -11,6 +15,8 @@ class Variable:
         self.creator = func
     
     def backward(self):
+        if self.grad is None:
+            self.grad = np.ones_like(self.data)
 
         # ------ recurrent implementation ------
         # f = self.creator        # 1. get func
@@ -30,23 +36,30 @@ class Variable:
                 funcs.append(x.creator)     # 将前一个函数添加到list中
 
 
+def as_array(x):
+    if np.isscalar(x):
+        return np.array(x)
+    return x
+
+
 class Function:
-    def __call__(self, input):
-        x = input.data
-        y = self.forward(x)
+    def __call__(self, inputs):
+        xs = [x.data for x in inputs]
+        ys = self.forward(xs)
 
-        output = Variable(y)
-        output.set_creator(self)    # make output variable save creator information
+        outputs = [Variable(as_array(y)) for y in ys]
+        for output in outputs:
+            output.set_creator(self)    # make output variable save creator information
         
-        self.input = input          # save the variable of input
-        self.output = output        # alse save output variable
+        self.inputs = inputs          # save the variable of input
+        self.outputs = outputs        # alse save output variable
 
-        return output
+        return outputs
     
-    def forward(self, x):
+    def forward(self, xs):
         raise NotImplementedError()
 
-    def backward(self, gy):
+    def backward(self, gys):
         raise NotImplementedError()
 
 
@@ -63,6 +76,10 @@ class Square(Function):
         return gx
 
 
+def square(x):
+    return Square()(x)
+
+
 class Exp(Function):
     def forward(self, x):
         y = np.exp(x)
@@ -76,20 +93,39 @@ class Exp(Function):
         return gx
 
 
+def exp(x):
+    return Exp()(x)
+
+
+class Add(Function):
+    def forward(self, xs):
+        x0, x1 = xs
+        y = x0 + x1
+
+        return (y,)
+
+
 if __name__ == '__main__':
-    A = Square()
-    B = Exp()
-    C = Square()
+    # A = Square()
+    # B = Exp()
+    # C = Square()
 
     x = Variable(np.array(0.5))
-    a = A(x)
-    b = B(a)
-    y = C(b)
+    # x = Variable(None)
+
+    # x = Variable(1.0)           # TypeError
+    # --------------------------
+    # a = square(x)
+    # b = exp(a)
+    # y = square(b)
+    # -->
+    y = square(exp(square(x)))
+    # --------------------------
     # print(f'{y=}')
 
-    assert y.creator == C
+    # assert y.creator == C
 
-    y.grad = np.array(1.0)
+    # y.grad = np.array(1.0)
 
     y.backward()
 
