@@ -12,6 +12,9 @@ class Variable:
         self.grad = None
         self.creator = None
     
+    def cleargrad(self):
+        self.grad = None        # init grad
+    
     def set_creator(self, func):
         self.creator = func
     
@@ -30,11 +33,23 @@ class Variable:
         funcs = [self.creator]
         while funcs:
             f = funcs.pop()                 # 1. get func
-            x, y = f.input, f.output        # 2. get func's input
-            x.grad = f.backward(y.grad)     # 3. backward call backward
+            # x, y = f.input, f.output        # 2. get func's input
+            # x.grad = f.backward(y.grad)     # 3. backward call backward
+            # --> 支持可变长参数
+            gys = [output.grad for output in f.outputs]
+            gxs = f.backward(*gys)
+            if not isinstance(gxs, Tuple):
+                gxs = (gxs,)
+            
+            for x, gx in zip(f.inputs, gxs):
+                # x.grad = gx
+                if x.grad is None:
+                    x.grad = gx
+                else:
+                    x.grad = x.grad + gx
 
-            if x.creator is not None:
-                funcs.append(x.creator)     # 将前一个函数添加到list中
+                if x.creator is not None:
+                    funcs.append(x.creator)     # 将前一个函数添加到list中
 
 
 def as_array(x):
@@ -75,7 +90,7 @@ class Square(Function):
         return y
     
     def backward(self, gy):
-        x = self.input.data
+        x = self.inputs[0].data
         gx = 2 * x * gy
 
         return gx
@@ -108,24 +123,25 @@ class Add(Function):
 
         return y
 
+    def backward(self, gy):
+        return gy, gy
+
 
 def add(x0, x1):
     return Add()(x0, x1)
 
 
 if __name__ == '__main__':
-    # xs = [Variable(np.array(2)), Variable(np.array(3))]
-    x0 = Variable(np.array(2))
-    x1 = Variable(np.array(3))
+    
+    x = Variable(np.array(3.0))
+    y = add(x, x)
+    y.backward()
+    print(f'{x.grad}')
 
-    # f = Add()
-    # y = f(x0, x1)
-    # -->
-    y = add(x0, x1)
-
-    print(y.data)
-
-    # print(f'{x.grad=}')
+    x.cleargrad()
+    y = add(add(x, x), x)
+    y.backward()
+    print(f'{x.grad}')
 
 
 
